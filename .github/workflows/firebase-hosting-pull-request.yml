@@ -23,9 +23,9 @@ jobs:
           envkey_VUE_APP_RECAPTCHA_V3_PUBLIC_KEY: '${{ secrets.VUE_APP_RECAPTCHA_V3_PUBLIC_KEY }}'
           file_name: .env.production
       - name: Installing project dependencies
-      - run: npm install
+        run: npm install
       - name: Building the project
-      - run: npm run build
+        run: npm run build
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
