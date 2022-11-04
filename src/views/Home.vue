@@ -68,6 +68,7 @@
             <div class="d-flex flex-wrap justify-content-between align-items-center">
               <div class="col d-flex align-items-center justify-content-center"><h3>Mi Horario</h3></div>
               <div class="col-md-2 justify-content-end d-flex">
+                <button type="button" class="btn btn-primary me-3" @click="generateIcal()"><i class="fas fa-calendar"></i></button>
                 <button type="button" class="btn btn-danger" @click="handleDeleteSchedule()"><i class="fas fa-trash"></i></button>
               </div>
             </div>
@@ -187,6 +188,7 @@
 import { db } from '@/firebase'
 import Schedule from '@/components/Schedule'
 import {Modal} from 'bootstrap'
+import { Component, Property } from 'immutable-ics'
 import { collection, query, getDocs, doc, getDoc,where} from "firebase/firestore";
 var colors = [ "#3B7682", "#686868", "#6D255F", "#8E4A17", "#11077D",
   "#BB1F3C", "#40A443", "#795943", "#9F2020", "#63078A"]
@@ -197,8 +199,9 @@ export default {
   },
   data() {
     return {
+      days: {'L':0,'M':1,'W':2,'J':3,'V':4,'S':5},
       section_types: {'T': 'Teoría','L': 'Laboratorio','E': 'Ejercicios'},
-      hours: {'1': '8:00-9:30','2': '9:40-11:10','3': '11:20-12:50','4': '13:50-15:20','5':'15:30-17:00','6': '17:10-18:40','7': '18:45-20:10','8': '20:10-21:35','9': '21:35-23:00'},
+      hours: {'1': '8:15-9:35','2': '9:50-11:10','3': '11:25-12:45','4': '13:45-15:05','5':'15:20-16:40','6': '16:55-18:15','7': '18:45-20:05','8': '20:05-21:25','9': '21:25-22:45'},
       enable_program_select: false,
       schools: [],
       programs: [],
@@ -285,6 +288,133 @@ export default {
     }
   },
   methods: {
+    generateIcal: async function () {
+      var calendar = new Component({
+        name: 'VCALENDAR',
+        properties: [
+          new Property({ name: 'VERSION', value: 2 }),
+          new Property({ name: 'CALSCALE', value: 'GREGORIAN' }),
+          new Property({ name: 'METHOD', value: 'PUBLISH' }),
+          new Property({ name: 'X-WR-TIMEZONE', value: 'America/Santiago' })
+        ],
+        components: [
+          new Component({
+            name: 'VTIMEZONE',
+            properties: [
+              new Property({ name: 'TZID', value: 'America/Santiago' }),
+              new Property({ name: 'X-LIC-LOCATION', value: 'America/Santiago' })
+            ],
+            components: [
+              new Component({
+                name: 'STANDARD',
+                properties: [
+                  new Property({ name: 'TZOFFSETFROM', value: '-0300' }),
+                  new Property({ name: 'TZOFFSETTO', value: '-0400' }),
+                  new Property({ name: 'TZNAME', value: '-04' }),
+                  new Property({ name: 'DTSTART', value: '19700405T000000' }),
+                  new Property({ name: 'RRULE', value: 'FREQ=YEARLY;BYMONTH=4;BYDAY=1SU' }),
+                ],
+              }),
+              new Component({
+                name: 'DAYLIGHT',
+                properties: [
+                  new Property({ name: 'TZOFFSETFROM', value: '-0300' }),
+                  new Property({ name: 'TZOFFSETTO', value: '-0400' }),
+                  new Property({ name: 'TZNAME', value: '-03' }),
+                  new Property({ name: 'DTSTART', value: '19700906T000000' }),
+                  new Property({ name: 'RRULE', value: 'FREQ=YEARLY;BYMONTH=9;BYDAY=1SU' }),
+                ],
+              })
+            ]
+          })
+        ]
+      })
+      Object.keys(this.schedule).forEach((day) =>{
+        Object.keys(this.schedule[day]).forEach((hour) =>{
+          this.schedule[day][hour].forEach( (lecture) => {
+            var hours = this.hours[hour].split('-')
+            var start_hour = hours[0].split(':')
+            var end_hour = hours[1].split(':')
+            start_hour[0] = start_hour[0].length==1 ? '0'+start_hour[0] : start_hour[0]
+            end_hour[0] = end_hour[0].length==1 ? '0'+end_hour[0] : end_hour[0]
+            var event = new Component({
+              name: 'VEVENT',
+              properties: [
+                new Property({
+                  name: 'DTSTART',
+                  parameters: {TZID: 'America/Santiago'},
+                  value: '202208'+(15+parseInt(this.days[day])).toString()+'T'+start_hour[0]+start_hour[1]+'00'
+                }),
+                new Property({
+                  name: 'DTEND',
+                  parameters: {TZID: 'America/Santiago'},
+                  value: '202208'+(15+parseInt(this.days[day])).toString()+'T'+end_hour[0]+end_hour[1]+'00'
+                }),
+                new Property({
+                  name: 'RRULE',
+                  value: 'FREQ=WEEKLY;INTERVAL=1;UNTIL=20221224T000000Z'
+                }),
+                new Property({
+                  name: 'DESCRIPTION',
+                  value: 'Horario generado con https://horasusach.web.app'
+                }),
+                new Property({
+                  name: 'LOCATION',
+                  value: lecture.classroom ?? ''
+                }),
+                new Property({
+                  name: 'STATUS',
+                  value: 'CONFIRMED'
+                }),
+                new Property({
+                  name: 'SUMMARY',
+                  value: lecture.name
+                }),
+              ],
+              components: [
+                new Component({
+                  name: 'VALARM',
+                  properties: [
+                    new Property({
+                      name: 'ACTION',
+                      value: 'DISPLAY'
+                    }),
+                    new Property({
+                      name: 'DESCRIPTION',
+                      value: 'This is an event reminder'
+                    }),
+                    new Property({
+                      name: 'TRIGGER',
+                      value: '-P0DT0H10M0S'
+                    })
+                  ]
+                })
+              ]
+            })
+            calendar = calendar.pushComponent(event)
+          })
+        })
+      })  
+
+      var filename = `horario.ics`
+      console.log(calendar.toString())
+      var blob = new Blob([calendar.toString()], {
+          type: 'text/calendar'
+      })
+      console.log(blob.type)
+      if (window.navigator.msSaveOrOpenBlob) {
+          window.navigator.msSaveBlob(blob, filename)
+        } else {
+          var elem = window.document.createElement('a')
+          elem.href = window.URL.createObjectURL(blob)
+          elem.download = filename
+          document.body.appendChild(elem)
+          elem.click()
+          document.body.removeChild(elem)
+        }
+      
+      
+    },
     handleSelectSchool: async function(){
       this.id_program = '';
       this.semester = '';
@@ -309,7 +439,7 @@ export default {
       this.semester = '';
       this.pages = 0;
       if(this.id_program != ''){
-        const docRef = doc(db, "schedules",this.id_school+'_'+this.id_program+'_'+'2022-01');
+        const docRef = doc(db, "schedules",this.id_school+'_'+this.id_program+'_'+'2022-02');
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           this.semester_schedule = docSnap.data().schedule;
