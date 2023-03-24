@@ -343,16 +343,16 @@ export default {
                 new Property({
                   name: 'DTSTART',
                   parameters: {TZID: 'America/Santiago'},
-                  value: '202208'+(15+parseInt(this.days[day])).toString()+'T'+start_hour[0]+start_hour[1]+'00'
+                  value: '202303'+(13+parseInt(this.days[day])).toString()+'T'+start_hour[0]+start_hour[1]+'00'
                 }),
                 new Property({
                   name: 'DTEND',
                   parameters: {TZID: 'America/Santiago'},
-                  value: '202208'+(15+parseInt(this.days[day])).toString()+'T'+end_hour[0]+end_hour[1]+'00'
+                  value: '202303'+(13+parseInt(this.days[day])).toString()+'T'+end_hour[0]+end_hour[1]+'00'
                 }),
                 new Property({
                   name: 'RRULE',
-                  value: 'FREQ=WEEKLY;INTERVAL=1;UNTIL=20221224T000000Z'
+                  value: 'FREQ=WEEKLY;INTERVAL=1;UNTIL=20230715T000000Z'
                 }),
                 new Property({
                   name: 'DESCRIPTION',
@@ -425,11 +425,13 @@ export default {
       if(this.id_school != ''){
         const q = query(collection(db, "schools",this.id_school,"programs"),where("hidden","==",false));
         const querySnapshot = await getDocs(q);
-        querySnapshot.forEach((doc) => {
-          var new_program = doc.data()
-          new_program.id = doc.id
-          this.programs.push(new_program)
+        const programs = querySnapshot.docs.map(doc => {
+          return {
+            id: doc.id,
+            ...doc.data()
+          }
         });
+        this.programs = programs;
       }
       
     },
@@ -439,7 +441,7 @@ export default {
       this.semester = '';
       this.pages = 0;
       if(this.id_program != ''){
-        const docRef = doc(db, "schedules",this.id_school+'_'+this.id_program+'_'+'2022-02');
+        const docRef = doc(db, "schedules",this.id_school+'_'+this.id_program+'_'+'2023-01');
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           this.semester_schedule = docSnap.data().schedule;
